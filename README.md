@@ -1,3 +1,5 @@
+<img width="150" height="141" alt="droid-bay" src="https://github.com/user-attachments/assets/c5c24af5-7a9d-4faf-82c8-9eb3e93d9ab5" />
+
 # Droid Bay
 
 This is a repository of agents and skills (for personal use). It's primarily focused on my personal needs and interests:
