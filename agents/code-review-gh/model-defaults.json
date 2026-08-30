@@ -1,0 +1,14 @@
+{
+  "openai": {
+    "model": "gpt-5.6-luna",
+    "effort": "medium"
+  },
+  "anthropic": {
+    "model": "claude-haiku-4.5",
+    "effort": "medium"
+  },
+  "openrouter": {
+    "model": "deepseek/deepseek-v4-flash-0731",
+    "effort": "high"
+  }
+}

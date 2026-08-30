@@ -3,7 +3,6 @@ package sdk
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -23,8 +22,6 @@ type Config struct {
 	Effort string
 }
 
-// Tool is a function the model may call during generation. Execute receives
-// the tool input as raw JSON and returns the result text shown to the model.
 type Tool struct {
 	Name string
 	Description string
@@ -32,20 +29,15 @@ type Tool struct {
 	Execute func(ctx context.Context, input json.RawMessage) (string, error)
 }
 
-// ModelDefault is one entry of a per-agent model-defaults file: the model to
-// use for a provider and the reasoning effort to send (nil = none).
 type ModelDefault struct {
 	Model string `json:"model"`
 	Effort *string `json:"effort"`
 }
 
-// DebugLogger receives per-step observability output during generation.
-// *log.Logger satisfies this interface.
 type DebugLogger interface {
 	Printf(format string, args ...any)
 }
 
-// Option customizes a text generation request.
 type Option func(*generateOptions)
 
 type generateOptions struct {
@@ -57,31 +49,22 @@ type generateOptions struct {
 
 const defaultMaxSteps = 30
 
-// WithTemperature sets the sampling temperature.
 func WithTemperature(t float64) Option {
 	return func(o *generateOptions) { o.temperature = t }
 }
 
-// WithTools attaches tools the model may call during generation.
 func WithTools(tools ...Tool) Option {
 	return func(o *generateOptions) { o.tools = tools }
 }
 
-// WithMaxSteps sets the maximum number of automatic tool-loop iterations.
-// When tools are attached and no step limit is set, the SDK defaults to 30.
 func WithMaxSteps(n int) Option {
 	return func(o *generateOptions) { o.maxSteps = n }
 }
 
-// WithDebugLog attaches a logger that receives each step's reasoning, text,
-// and tool calls as the generation progresses.
 func WithDebugLog(l DebugLogger) Option {
 	return func(o *generateOptions) { o.debugLog = l }
 }
 
-// ConfigFromEnv builds a config from environment variables alone: the
-// provider (LLM_PROVIDER, default openai) and its API key. Model and effort
-// stay empty and must be filled in by the caller.
 func ConfigFromEnv() Config {
 	provider := helpers.EnvOr("LLM_PROVIDER", "openai")
 	keyVars := map[string]string{
@@ -95,47 +78,39 @@ func ConfigFromEnv() Config {
 	}
 }
 
-func ConfigFromDefaults(path string) (Config, error) {
-	defaults, err := loadModelDefaults(path)
-	if err != nil {
-		return Config{}, err
+func MissingLLMEnv() []string {
+	provider := helpers.EnvOr("LLM_PROVIDER", "openai")
+	keyVars := map[string]string{
+		"openai": "OPENAI_API_KEY",
+		"anthropic": "ANTHROPIC_API_KEY",
+		"openrouter": "OPENROUTER_API_KEY",
 	}
-
-	cfg := ConfigFromEnv()
-	if d, ok := defaults[cfg.Provider]; ok {
-		cfg.Model = d.Model
-		if d.Effort != nil {
-			cfg.Effort = *d.Effort
-		}
+	keyVar, ok := keyVars[provider]
+	if !ok {
+		return []string{fmt.Sprintf("LLM_PROVIDER=%q is not one of openai, anthropic, openrouter", provider)}
 	}
-	return cfg, nil
+	return helpers.MissingEnv(keyVar)
 }
 
-func ConfigForRun(defaultsPath, model string) (Config, error) {
-	cfg, err := ConfigFromDefaults(defaultsPath)
-	if err != nil {
-		if model == "" || !errors.Is(err, os.ErrNotExist) {
-			return Config{}, err
+func ConfigForRun(defaults []byte, model string) (Config, error) {
+	cfg := ConfigFromEnv()
+	if len(defaults) > 0 {
+		var parsed map[string]ModelDefault
+		if err := json.Unmarshal(defaults, &parsed); err != nil {
+			return Config{}, fmt.Errorf("sdk: parse model defaults: %w", err)
 		}
-		cfg = ConfigFromEnv()
+		if d, ok := parsed[cfg.Provider]; ok {
+			cfg.Model = d.Model
+			if d.Effort != nil {
+				cfg.Effort = *d.Effort
+			}
+		}
 	}
 	if model != "" {
 		cfg.Model = model
 		cfg.Effort = ""
 	}
 	return cfg, nil
-}
-
-func loadModelDefaults(path string) (map[string]ModelDefault, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("sdk: read model defaults: %w", err)
-	}
-	var defaults map[string]ModelDefault
-	if err := json.Unmarshal(data, &defaults); err != nil {
-		return nil, fmt.Errorf("sdk: parse model defaults: %w", err)
-	}
-	return defaults, nil
 }
 
 func Model(cfg Config) (provider.LanguageModel, error) {

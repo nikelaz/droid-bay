@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -15,14 +16,22 @@ import (
 	"github.com/nikelaz/droid-bay/sdk"
 )
 
-const SYSTEM_PROMPT_PATH = "./system-prompt.md"
-const USER_PROMPT_PATH = "./user-prompt.md"
-const MODEL_DEFAULTS_PATH = "./model-defaults.json"
-const TEMPERATURE = 0.2
-const MAX_STEPS = 300
-const RUN_TIMEOUT = 90 * time.Minute
-const CODEBASES_ROOT = ".codebases"
-const LOGS_DIR = ".logs"
+const (
+	TEMPERATURE    = 0.2
+	MAX_STEPS      = 300
+	RUN_TIMEOUT    = 90 * time.Minute
+	CODEBASES_ROOT = ".codebases"
+	LOGS_DIR       = ".logs"
+)
+
+//go:embed system-prompt.md
+var systemPrompt string
+
+//go:embed user-prompt.md
+var userPrompt string
+
+//go:embed model-defaults.json
+var modelDefaults []byte
 
 type User struct {
 	Login string `json:"login"`
@@ -51,11 +60,10 @@ type Issue struct {
 }
 
 type options struct {
-	owner string
-	repo string
-	issue int
-	envFile string
-	model string
+	owner    string
+	repo     string
+	issue    int
+	model    string
 	codebase string
 }
 
@@ -63,17 +71,15 @@ func parseArgs() options {
 	owner := flag.String("owner", "", "repository owner (user or org)")
 	repo := flag.String("repo", "", "repository name")
 	num := flag.Int("issue", 0, "issue number")
-	envFile := flag.String("env", ".env", "path to an environment file (optional)")
 	model := flag.String("model", "", "model to use; overrides model-defaults.json and skips its reasoning effort")
 	codebase := flag.String("codebase", "", "path to a local repo checkout (default: auto-clones to .codebases/<owner>/<repo>)")
 	flag.Parse()
 
 	return options{
-		owner: *owner,
-		repo: *repo,
-		issue: *num,
-		envFile: *envFile,
-		model: *model,
+		owner:    *owner,
+		repo:     *repo,
+		issue:    *num,
+		model:    *model,
 		codebase: *codebase,
 	}
 }
@@ -90,22 +96,27 @@ func main() {
 		defer closeLog()
 	}
 
-	if err := helpers.LoadEnv(opts.envFile); err != nil {
-		log.Fatalf("load env file: %v", err)
-	}
-
 	if opts.owner == "" || opts.repo == "" || opts.issue <= 0 {
-		log.Fatal("usage: issue-research-gh -owner <owner> -repo <repo> -issue <number> [-env <file>]")
+		log.Fatal("usage: issue-research-gh -owner <owner> -repo <repo> -issue <number>")
 	}
 
-	if os.Getenv("GITHUB_TOKEN") == "" {
-		log.Fatal("GITHUB_TOKEN is required (set it in the env file)")
+	missing := sdk.MissingLLMEnv()
+	missing = append(missing, helpers.MissingEnv("GITHUB_TOKEN")...)
+	if len(missing) > 0 {
+		log.Fatalf("missing environment variables: %s (set them in your shell environment)", strings.Join(missing, ", "))
 	}
+
+	token := os.Getenv("GITHUB_TOKEN")
 
 	ctx, cancel := context.WithTimeout(context.Background(), RUN_TIMEOUT)
 	defer cancel()
 
-	ghClient := connectGitHubMCP(ctx, os.Getenv("GITHUB_TOKEN"))
+	cfg, err := sdk.ConfigForRun(modelDefaults, opts.model)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ghClient := connectGitHubMCP(ctx, token)
 	defer ghClient.Close()
 
 	if opts.codebase == "" {
@@ -131,20 +142,7 @@ func main() {
 	}
 	log.Printf("issue #%d: %s (state=%s)", issue.Number, issue.Title, issue.State)
 
-	prompt, err := renderPrompt(helpers.PathFor(USER_PROMPT_PATH), issue)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	systemPrompt, err := os.ReadFile(helpers.PathFor(SYSTEM_PROMPT_PATH))
-	if err != nil {
-		log.Fatalf("read system prompt: %v", err)
-	}
-
-	cfg, err := sdk.ConfigForRun(helpers.PathFor(MODEL_DEFAULTS_PATH), opts.model)
-	if err != nil {
-		log.Fatal(err)
-	}
+	prompt := renderPrompt(userPrompt, issue)
 
 	webClient, webTools, err := sdk.WebSearchTools(ctx, "issue-research-gh-web", cfg)
 	if err != nil {
@@ -162,7 +160,7 @@ func main() {
 	tools = append(tools, codeTools...)
 
 	log.Printf("generating research report (max %d steps)", MAX_STEPS)
-	report, err := sdk.Generate(ctx, cfg, string(systemPrompt), prompt,
+	report, err := sdk.Generate(ctx, cfg, systemPrompt, prompt,
 		sdk.WithTemperature(TEMPERATURE),
 		sdk.WithTools(tools...),
 		sdk.WithMaxSteps(MAX_STEPS),
@@ -287,16 +285,12 @@ func postComment(ctx context.Context, client *sdk.MCPClient, tool, owner, repo s
 	return err
 }
 
-func renderPrompt(path string, issue *Issue) (string, error) {
-	tpl, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("read user prompt template: %w", err)
-	}
+func renderPrompt(tpl string, issue *Issue) string {
 	return strings.NewReplacer(
 		"{{title}}", issue.Title,
 		"{{body}}", issue.Body,
 		"{{metadata}}", issueMetadata(issue),
-	).Replace(string(tpl)), nil
+	).Replace(tpl)
 }
 
 func issueMetadata(issue *Issue) string {

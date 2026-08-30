@@ -14,3 +14,6 @@
 
 # Per-agent run logs
 .logs/
+
+# Release output from the droid-bay script
+dist/
