@@ -1,5 +1,12 @@
 module github.com/nikelaz/droid-bay/sdk
 
-go 1.27.0
+go 1.26.7
 
-require github.com/zendev-sh/goai v0.9.8
+require (
+	github.com/nikelaz/droid-bay/helpers v0.0.0-00010101000000-000000000000
+	github.com/zendev-sh/goai v0.9.8
+)
+
+replace github.com/nikelaz/droid-bay/helpers => ../helpers
+
+require golang.org/x/oauth2 v0.36.0 // indirect

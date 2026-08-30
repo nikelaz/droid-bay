@@ -8,3 +8,9 @@
 # Go build artifacts (each agent ignores its own binary too)
 *.test
 *.out
+
+# Cloned codebases for research agents
+.codebases/
+
+# Per-agent run logs
+.logs/
