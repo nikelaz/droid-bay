@@ -1,6 +1,6 @@
 ---
 name: c-coding-style
-description: C programming style rules. Use when working with C/C++ code.
+description: C programming style rules. Use when working with C code.
 ---
 
 # C Coding Style
@@ -11,6 +11,7 @@ description: C programming style rules. Use when working with C/C++ code.
 * Prefer contiguous, cache-friendly data layouts and avoid pointer-heavy structures without a concrete reason.
 * Be conscious of struct layout, alignment, padding, and frequently accessed data.
 * Minimize unnecessary allocations.
+* Have functions that can fail return a project-defined `Result` type distinguishing `Ok` from `Error`, with `Ok = 0`; return payloads through out-parameters.
 * Organize dynamic memory by lifetime and prefer arenas when allocations naturally share a lifetime.
 * When the project uses arenas, pass `Arena *` to APIs that produce arena-owned results so the caller controls their lifetime.
 * When the project uses arenas, use scratch arenas or arena checkpoints for temporary allocations and reclaim memory in lifetime-sized batches.

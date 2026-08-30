@@ -36,5 +36,8 @@ description: Use this skill when doing any software development or software engi
 
 ## Style
 
-- When working with C or C++ code, use the `c-coding-style` skill.
+- When working with C code, use the `c-coding-style` skill.
+- When working with C++ code, use the `cpp-coding-style` skill.
+- When working with Rust code, use the `rust-coding-style` skill.
+- When working with Zig code, use the `zig-coding-style` skill.
 - When working with JavaScript or TypeScript use the `js-coding-style` skill
