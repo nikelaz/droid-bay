@@ -10,4 +10,4 @@ Generate a research report for a GitHub issue (grounded in the codebase, with we
 
 ## Web search
 
-Web search runs through SearXNG. By default the agent starts a SearXNG container with podman (docker as fallback) on a free localhost port and shuts it down on exit, so no API keys are needed. Set `SEARXNG_URL` to use an existing SearXNG instance instead, or `SEARXNG_IMAGE` to override the image (`docker.io/searxng/searxng:latest`).
+Web search runs through SearXNG. The agent connects to an existing SearXNG instance at `http://127.0.0.1:8888`, or at `SEARXNG_URL` if set. If none is reachable, install SearXNG (https://docs.searxng.org) and run it locally.
