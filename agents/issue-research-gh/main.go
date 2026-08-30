@@ -2,15 +2,11 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -113,7 +109,7 @@ func main() {
 	defer ghClient.Close()
 
 	if opts.codebase == "" {
-		clonedPath, cloneErr := cloneCodebase(opts.owner, opts.repo)
+		clonedPath, cloneErr := helpers.CloneRepo(opts.owner, opts.repo, CODEBASES_ROOT)
 		if cloneErr != nil {
 			log.Fatal(cloneErr)
 		}
@@ -135,44 +131,34 @@ func main() {
 	}
 	log.Printf("issue #%d: %s (state=%s)", issue.Number, issue.Title, issue.State)
 
-	prompt, err := renderPrompt(pathFor(USER_PROMPT_PATH), issue)
+	prompt, err := renderPrompt(helpers.PathFor(USER_PROMPT_PATH), issue)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	systemPrompt, err := os.ReadFile(pathFor(SYSTEM_PROMPT_PATH))
+	systemPrompt, err := os.ReadFile(helpers.PathFor(SYSTEM_PROMPT_PATH))
 	if err != nil {
 		log.Fatalf("read system prompt: %v", err)
 	}
 
-	cfg, err := sdk.ConfigFromDefaults(pathFor(MODEL_DEFAULTS_PATH))
+	cfg, err := sdk.ConfigForRun(helpers.PathFor(MODEL_DEFAULTS_PATH), opts.model)
 	if err != nil {
-		if opts.model == "" || !errors.Is(err, os.ErrNotExist) {
-			log.Fatal(err)
-		}
-		cfg = sdk.ConfigFromEnv()
-	}
-	if opts.model != "" {
-		cfg.Model = opts.model
-		cfg.Effort = ""
+		log.Fatal(err)
 	}
 
-	webClient := connectWebSearchMCP(ctx)
+	webClient, webTools, err := sdk.WebSearchTools(ctx, "issue-research-gh-web", cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer webClient.Close()
-
-	webTools, err := webClient.Tools(ctx)
-	if err != nil {
-		log.Fatalf("list web search tools: %v", err)
-	}
-	tools := make([]sdk.Tool, 0, len(webTools)+4)
-	for _, t := range webTools {
-		tools = append(tools, prepareWebTool(t, cfg.Model))
-	}
 
 	codeTools, err := codeClient.Tools(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	tools := make([]sdk.Tool, 0, len(webTools)+len(codeTools))
+	tools = append(tools, webTools...)
 	tools = append(tools, codeTools...)
 
 	log.Printf("generating research report (max %d steps)", MAX_STEPS)
@@ -209,41 +195,15 @@ func connectGitHubMCP(ctx context.Context, token string) *sdk.MCPClient {
 		log.Fatal("GITHUB_MCP_CMD is empty; expected at least a command")
 	}
 
-	client, err := sdk.NewMCPClient(ctx, sdk.MCPConfig{
-		Name: "issue-research-gh",
-		Version: "1.0.0",
-		Command: argv[0],
-		Args: argv[1:],
-		Env: map[string]string{
-			"GITHUB_TOKEN": token,
-			"GITHUB_PERSONAL_ACCESS_TOKEN": token,
-		},
-		RequestTimeout: 2 * time.Minute,
+	client, err := sdk.ConnectStdio(ctx, "issue-research-gh", argv[0], argv[1:], map[string]string{
+		"GITHUB_TOKEN": token,
+		"GITHUB_PERSONAL_ACCESS_TOKEN": token,
 	})
 	if err != nil {
 		log.Fatalf("connect to GitHub MCP server: %v (is it installed / Node available?)", err)
 	}
 
 	return client
-}
-
-func cloneCodebase(owner, repo string) (string, error) {
-	dir := filepath.Join(CODEBASES_ROOT, owner, repo)
-	if err := os.RemoveAll(dir); err != nil {
-		return "", fmt.Errorf("remove previous checkout: %w", err)
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("create codebase dir: %w", err)
-	}
-	cmd := exec.Command("git", "clone", "--depth", "1",
-		"git@github.com:"+owner+"/"+repo+".git", ".")
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("git clone %s/%s: %v: %s", owner, repo, err, strings.TrimSpace(string(out)))
-	}
-	return dir, nil
 }
 
 func connectCodebaseMCP(ctx context.Context, root string) *sdk.MCPClient {
@@ -262,117 +222,12 @@ func connectCodebaseMCP(ctx context.Context, root string) *sdk.MCPClient {
 		log.Fatal("CODEBASE_MCP_CMD is empty; expected at least a command")
 	}
 
-	client, err := sdk.NewMCPClient(ctx, sdk.MCPConfig{
-		Name: "issue-research-gh-codebase",
-		Version: "1.0.0",
-		Command: argv[0],
-		Args: argv[1:],
-		RequestTimeout: 2 * time.Minute,
-	})
+	client, err := sdk.ConnectStdio(ctx, "issue-research-gh-codebase", argv[0], argv[1:], nil)
 	if err != nil {
 		log.Fatalf("connect to codebase MCP server: %v (is it installed / Node available?)", err)
 	}
 
 	return client
-}
-
-func pathFor(name string) string {
-	if filepath.IsAbs(name) {
-		return name
-	}
-	if exe, err := os.Executable(); err == nil {
-		p := filepath.Join(filepath.Dir(exe), name)
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return name
-}
-
-func connectWebSearchMCP(ctx context.Context) *sdk.MCPClient {
-	if cmd := os.Getenv("WEB_SEARCH_MCP_CMD"); cmd != "" {
-		argv, err := helpers.SplitArgs(cmd)
-		if err != nil {
-			log.Fatalf("parse WEB_SEARCH_MCP_CMD: %v", err)
-		}
-		client, err := sdk.NewMCPClient(ctx, sdk.MCPConfig{
-			Name: "issue-research-gh-web",
-			Command: argv[0],
-			Args: argv[1:],
-			RequestTimeout: 2 * time.Minute,
-		})
-		if err != nil {
-			log.Fatalf("connect to web search MCP server: %v", err)
-		}
-		return client
-	}
-
-	client, err := sdk.NewMCPClient(ctx, sdk.MCPConfig{
-		Name: "issue-research-gh-web",
-		URL: helpers.EnvOr("WEB_SEARCH_URL", "https://search.parallel.ai/mcp"),
-		RequestTimeout: 2 * time.Minute,
-	})
-	if err != nil {
-		log.Fatalf("connect to web search MCP server: %v", err)
-	}
-	return client
-}
-
-var searchSessionID = newSearchSessionID()
-
-func newSearchSessionID() string {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return strconv.FormatInt(time.Now().UnixNano(), 16)
-	}
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}
-
-func prepareWebTool(t sdk.Tool, model string) sdk.Tool {
-	t.InputSchema = hideSchemaProps(t.InputSchema, "session_id", "model_name")
-	execute := t.Execute
-	t.Execute = func(ctx context.Context, input json.RawMessage) (string, error) {
-		var args map[string]any
-		if len(input) > 0 {
-			if err := json.Unmarshal(input, &args); err != nil {
-				return "", err
-			}
-		}
-		if args == nil {
-			args = make(map[string]any)
-		}
-		args["session_id"] = searchSessionID
-		if model != "" {
-			args["model_name"] = model
-		}
-		in, err := json.Marshal(args)
-		if err != nil {
-			return "", err
-		}
-		return execute(ctx, in)
-	}
-	return t
-}
-
-func hideSchemaProps(schema json.RawMessage, props ...string) json.RawMessage {
-	var s map[string]any
-	if err := json.Unmarshal(schema, &s); err != nil {
-		return schema
-	}
-	properties, ok := s["properties"].(map[string]any)
-	if !ok {
-		return schema
-	}
-	for _, p := range props {
-		delete(properties, p)
-	}
-	out, err := json.Marshal(s)
-	if err != nil {
-		return schema
-	}
-	return out
 }
 
 func resolveTools(ctx context.Context, client *sdk.MCPClient) (getIssueTool, commentTool string, err error) {

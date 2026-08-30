@@ -116,3 +116,29 @@ func mcpText(content []mcp.ContentBlock) string {
 	}
 	return strings.Join(parts, "\n")
 }
+
+func ConnectStdio(ctx context.Context, name, command string, args []string, env map[string]string) (*MCPClient, error) {
+	if command == "" {
+		return nil, fmt.Errorf("sdk: connect stdio MCP requires a command")
+	}
+	return NewMCPClient(ctx, MCPConfig{
+		Name: name,
+		Version: "1.0.0",
+		Command: command,
+		Args: args,
+		Env: env,
+		RequestTimeout: 2 * time.Minute,
+	})
+}
+
+func ConnectHTTP(ctx context.Context, name, url string) (*MCPClient, error) {
+	if url == "" {
+		return nil, fmt.Errorf("sdk: connect HTTP MCP requires a URL")
+	}
+	return NewMCPClient(ctx, MCPConfig{
+		Name: name,
+		Version: "1.0.0",
+		URL: url,
+		RequestTimeout: 2 * time.Minute,
+	})
+}

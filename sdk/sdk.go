@@ -3,6 +3,7 @@ package sdk
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -106,6 +107,21 @@ func ConfigFromDefaults(path string) (Config, error) {
 		if d.Effort != nil {
 			cfg.Effort = *d.Effort
 		}
+	}
+	return cfg, nil
+}
+
+func ConfigForRun(defaultsPath, model string) (Config, error) {
+	cfg, err := ConfigFromDefaults(defaultsPath)
+	if err != nil {
+		if model == "" || !errors.Is(err, os.ErrNotExist) {
+			return Config{}, err
+		}
+		cfg = ConfigFromEnv()
+	}
+	if model != "" {
+		cfg.Model = model
+		cfg.Effort = ""
 	}
 	return cfg, nil
 }
