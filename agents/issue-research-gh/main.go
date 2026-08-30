@@ -144,11 +144,11 @@ func main() {
 
 	prompt := renderPrompt(userPrompt, issue)
 
-	webClient, webTools, err := sdk.WebSearchTools(ctx, "issue-research-gh-web", cfg)
+	webTools, stopSearch, err := sdk.WebSearchTools(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer webClient.Close()
+	defer stopSearch()
 
 	codeTools, err := codeClient.Tools(ctx)
 	if err != nil {
