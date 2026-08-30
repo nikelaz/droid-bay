@@ -1,0 +1,53 @@
+name: release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: agents/code-review-gh/go.mod
+
+      - name: Build
+        run: ./scripts/build.sh
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat VERSION.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Package dist
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          base="droid-bay-$version"
+          staging="/tmp/$base"
+          mkdir -p "$staging"
+          cp -r dist/. "$staging/"
+          tar -czf "$base.tar.gz" -C /tmp "$base"
+          (cd /tmp && zip -r "$GITHUB_WORKSPACE/$base.zip" "$base")
+
+      - name: Create tag
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          git tag "$version"
+          git push origin "$version"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          gh release create "$version" \
+            "droid-bay-$version.tar.gz" \
+            "droid-bay-$version.zip" \
+            --title "droid-bay $version" \
+            --generate-notes
