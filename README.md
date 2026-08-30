@@ -22,6 +22,10 @@ Each of my "agents" is custom software for a couple of reasons:
 
 My agents are Go programs which you can compile and run natively on any system. The great thing is that they are lightweight and efficient - they can be deployed on a server to run remotely as well.
 
+## Docs
+
+- [Running SearXNG with podman](docs/searxng-podman.md) - local web search backend for the agents' `web_search` tool.
+
 ## Contributions
 
 No contributions are expected as this is my personal repository that I'm keeping public just in case someone finds it useful. Still, if you have a suggestion or a fix for something - feel free to open an issue.
