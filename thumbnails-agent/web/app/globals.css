@@ -1,0 +1,82 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+/* Keep the product palette in HeroUI's theme tokens; components keep their defaults. */
+:root {
+  --background: #faf7ff;
+  --foreground: #30203f;
+  --surface: #ffffff;
+  --surface-foreground: #30203f;
+  --overlay: #ffffff;
+  --overlay-foreground: #30203f;
+  --accent: #7c3aed;
+  --accent-soft: #ede4ff;
+  --accent-soft-foreground: #5b21b6;
+  --accent-foreground: #ffffff;
+  --focus: #8b5cf6;
+  --border: #e7ddf3;
+  --separator: #e7ddf3;
+  --muted: #756580;
+  --default: #f0e9f8;
+  --default-foreground: #30203f;
+  --field-background: #fcfaff;
+  --field-foreground: #30203f;
+  --field-placeholder: #756580;
+  --success: #5f8f4d;
+  --warning: #aa8123;
+  --danger: #ad5f4c;
+  --app-font-sans: "DM Sans", sans-serif;
+  --app-font-display: "Manrope", sans-serif;
+}
+
+@theme inline {
+  --font-sans: var(--app-font-sans);
+  --font-display: var(--app-font-display);
+}
+
+html {
+  min-width: 320px;
+}
+
+body {
+  min-height: 100dvh;
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--app-font-sans);
+  font-size: 0.875rem;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--app-font-display);
+}
+
+button:not(:disabled),
+summary {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+svg {
+  flex-shrink: 0;
+}
+
+/* Disabled dropdown entries that separate models by harness provider. */
+.provider-heading {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

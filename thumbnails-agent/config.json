@@ -1,0 +1,16 @@
+{
+  "providers": ["codex", "opencode"],
+  "codex_bin": "codex",
+  "codex_args": [
+    "--skip-git-repo-check",
+    "-s",
+    "workspace-write",
+    "-c",
+    "sandbox_workspace_write.network_access=true",
+    "-c",
+    "tools.web_search=true"
+  ],
+  "opencode_bin": "opencode",
+  "opencode_args": [],
+  "timeout_secs": 1800
+}
