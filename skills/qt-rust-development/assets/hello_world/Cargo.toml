@@ -1,0 +1,13 @@
+# Copyright (C) 2023 The Qt Company Ltd.
+# SPDX-License-Identifier: LicenseRef-Qt-Commercial OR BSD-3-Clause
+
+[package]
+name = "hello_world"
+version = "0.1.0"
+edition = "2024"
+description = "A hello world with Qt"
+
+[dependencies]
+qtbridge = { git = "https://github.com/qt/qtbridge-rust.git", rev = "f7fe523d10357751bc90c334263188610c0382cf" }
+
+[workspace]
