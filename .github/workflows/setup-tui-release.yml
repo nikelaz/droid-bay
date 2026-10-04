@@ -3,7 +3,7 @@ name: setup-tui release
 on:
   push:
     tags:
-      - "setup-tui-v*"
+      - "v*"
 
 permissions:
   contents: read
