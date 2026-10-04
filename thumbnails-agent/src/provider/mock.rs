@@ -74,17 +74,17 @@ impl Provider for MockProvider {
                 "concepts": [
                     {
                         "id": "c1", "title": "The impossible question",
-                        "prompt": format!("16:9 YouTube thumbnail for {topic}, one shocked creator close-up, giant question mark, high contrast blue and yellow, 3 word headline, clean mobile-readable layout"),
+                        "prompt": format!("16:9 YouTube thumbnail for {topic}, one expressive creator close-up, strong visual focal point, high contrast blue and yellow, clean mobile-readable layout, no text or labels"),
                         "rationale": "A direct curiosity hook with one clear focal point."
                     },
                     {
                         "id": "c2", "title": "Before and after",
-                        "prompt": format!("16:9 split-screen thumbnail explaining {topic}, dramatic red failure versus green success, oversized arrow, bold 2 word headline, cinematic lighting"),
+                        "prompt": format!("16:9 split-screen thumbnail explaining {topic}, dramatic red failure versus green success, clear visual contrast, cinematic lighting, no text or labels"),
                         "rationale": "Shows the payoff in a glance."
                     },
                     {
                         "id": "c3", "title": "The hidden mechanism",
-                        "prompt": format!("16:9 thumbnail for {topic}, one mysterious glowing object on dark background, creator pointing, vivid cyan accent, short punchy text, strong negative space"),
+                        "prompt": format!("16:9 thumbnail for {topic}, one mysterious glowing object on dark background, creator pointing, vivid cyan accent, strong negative space, no text or labels"),
                         "rationale": "Builds intrigue without clutter."
                     }
                 ]
