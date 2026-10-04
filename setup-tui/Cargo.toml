@@ -1,0 +1,15 @@
+[package]
+name = "setup-tui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
+crossterm = "0.29"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
