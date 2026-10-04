@@ -1,0 +1,85 @@
+name: setup-tui release
+
+on:
+  push:
+    tags:
+      - "setup-tui-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.asset }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset: linux-x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset: windows-x86_64
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            asset: macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            asset: macos-aarch64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Build executable
+        run: cargo build --release --target "${{ matrix.target }}" --manifest-path setup-tui/Cargo.toml
+
+      - name: Package Unix executable
+        if: runner.os != 'Windows'
+        run: tar -czf "setup-tui-${{ matrix.asset }}.tar.gz" -C "setup-tui/target/${{ matrix.target }}/release" setup-tui
+
+      - name: Package Windows executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "setup-tui/target/${{ matrix.target }}/release/setup-tui.exe" -DestinationPath "setup-tui-${{ matrix.asset }}.zip"
+
+      - name: Upload packaged executable
+        uses: actions/upload-artifact@v7
+        with:
+          name: setup-tui-${{ matrix.asset }}
+          path: setup-tui-${{ matrix.asset }}.*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download packaged executables
+        uses: actions/download-artifact@v8
+        with:
+          pattern: setup-tui-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release-assets/* --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
